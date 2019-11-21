@@ -1,0 +1,105 @@
+---
+title: "Shiny Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+```
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+library(tidyverse)
+library(viridis)
+library(p8105.datasets)
+library(plotly)
+```
+```{r}
+#在column上进行操作都不会显示在dashboard中
+data("nyc_airbnb")
+
+nyc_airbnb = 
+  nyc_airbnb %>% 
+  mutate(rating = review_scores_location / 2) %>%
+  rename(latitude = lat, longitude = long) %>%
+  select(
+    boro = neighbourhood_group, neighbourhood, rating, price, room_type,
+    latitude, longitude) %>%
+  filter(!is.na(rating))
+```
+
+```{r}
+boros = nyc_airbnb %>% distinct(boro) %>% pull()
+
+# selectInput widget
+# 加互动bar
+selectInput(
+  "boro_choice",  
+  label = h3("Select boro"),   # bar的名字
+  choices = boros, selected = "Manhattan")  # 变量名
+
+max_price = 1000
+min_price = nyc_airbnb %>% distinct(price) %>% min()
+  
+# sliderInput widget
+sliderInput(
+  "price_range",     # 新设的变量，以便在chart中显示
+  label = h3("Choose price range"),  # 新变量label
+  min = min_price, max = max_price, value = c(100, 400))  # 设置最大最小值
+
+room_choice = nyc_airbnb %>% distinct(room_type) %>% pull()
+
+# radioButtons widget
+radioButtons(
+  "room_choice", 
+  label = h3("Choose room type"),
+  choices = room_choice, selected = "Entire home/apt")
+```
+
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Chart A
+
+
+```{r}
+## shiny 无法debug，先不加shiny，确认图正确再加
+renderPlotly({
+  nyc_airbnb %>%
+  filter(
+    boro == input$boro_choice, 
+    price %in% input$price_range[1]:input$price_range[2],
+    room_type == input$room_choice) %>%
+  mutate(text_label = str_c("Price: $", price, '\nRating: ', rating)) %>% 
+  plot_ly(
+    x = ~longitude, y = ~latitude, type = "scatter", mode = "markers",
+    alpha = 0.5, color = ~price, text = ~text_label)
+})
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Chart B
+
+```{r}
+renderPrint({ 
+  input[["price_range"]]
+})
+```
+
+### Chart C
+
+```{r}
+renderPrint({ 
+  input[["room_choice"]]
+})
+```
+
